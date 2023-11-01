@@ -1,4 +1,10 @@
 #include <Servo.h>
+#include <ArduinoJson.h>
+#include <EEPROM.h>
+
+#define HEIGHT_ADRESS 0
+#define DISTANCE_ADRESS 1
+#define TOLERANCE_ADRESS 2
 
 double pi = 2 * acos(0.0);
 
@@ -8,17 +14,50 @@ const int ECHO_PIN = 6;
 const int SERVO = 9;
 
 // DEFININDO VARIAVEIS DO SISTEMA
-unsigned int Altura = 175;            // Medida em cm
-unsigned int DistanciaDesejada = 200; // Medida em cm
-int Tolerancia = 5;                   // Medida de tolerancia que há entre a distancia obtida e a distancia determinada
-int intervalo_de_aviso = 2 * 1000;
-
-long objDetLT = -intervalo_de_aviso; // Object Detectado Pela Ultima Vez
+unsigned int Altura;            // Medida em cm
+unsigned int DistanciaDesejada; // Medida em cm
+int Tolerancia;                   // Medida de tolerancia que há entre a distancia obtida e a distancia determinada
 
 long HipDistancia = 0;
 double ServoAngle = 0;
 
 Servo servo; // Instanciando a classe Servo
+
+void adjustServoAngle(){
+    ServoAngle = getAngleOf(Altura, DistanciaDesejada);
+    servo.write(ServoAngle); // Direcionando o servo para o angulo desejado
+}
+
+void setHeight(unsigned int height){
+    Altura = height;
+    EEPROM.write(HEIGHT_ADRESS, height);
+}
+void setWantedDistance(unsigned int distance){
+    DistanciaDesejada = distance;
+    EEPROM.write(DISTANCE_ADRESS, distance);
+}
+void setTolerance(int tolerance){
+    Tolerancia = tolerance;
+    EEPROM.write(TOLERANCE_ADRESS, tolerance);
+}
+
+void adjustHipDistance(){
+    HipDistancia = sqrt((long)Altura * Altura + DistanciaDesejada * DistanciaDesejada);
+}
+
+void adjustMeasures(unsigned int height,unsigned int wantedDistance,int tolerance){
+    setHeight(height);
+    setWantedDistance(wantedDistance);
+    setTolerance(tolerance);
+    adjustServoAngle();
+    adjustHipDistance();
+}
+
+void readMeasuresFromMemory(){
+    Altura = EEPROM.read(HEIGHT_ADRESS);
+    DistanciaDesejada = EEPROM.read(DISTANCE_ADRESS);
+    Tolerancia = EEPROM.read(TOLERANCE_ADRESS);
+}
 
 void setup()
 {
@@ -28,26 +67,44 @@ void setup()
     pinMode(TRIGGER_PIN, OUTPUT); // Configura o pino Trigger como saída
     pinMode(ECHO_PIN, INPUT);     // Configura o pino Echo como entrada
 
-    //=========== Calculando a medida de Distancia ====================
-    HipDistancia = sqrt((long)Altura * Altura + DistanciaDesejada * DistanciaDesejada);
-    Serial.print("Medida De Distancia a seguir: ");
-    Serial.println(HipDistancia);
-
-    //============= Calculando o angulo do Servo ==========================
-    ServoAngle = getAngleOf(Altura, DistanciaDesejada);
-    Serial.print("Angulo do Servo Motor: ");
-    Serial.println(ServoAngle);
-
-    // Configurando o Servo
-    servo.attach(SERVO);     // Inicializando o servo
-    servo.write(ServoAngle); // Direcionando o servo para o angulo desejado
+    servo.attach(SERVO);
+    
+    readMeasuresFromMemory();
+    adjustServoAngle();
+    adjustHipDistance();
+    
 }
 
 void loop()
 {
-
-    delay(50); // Aguarda 50ms entre medições para evitar interferências
-    // Realiza uma medição de distância em centímetros
+    StaticJsonDocument<200> jsonDocument;
+    StaticJsonDocument<200> jsonBuffer;
+    unsigned long startTime = millis();
+    while (millis() - startTime < 50) {
+        // salvar o JSON vindo do serial
+        while (Serial.available() > 0) {
+            DeserializationError error = deserializeJson(jsonBuffer, Serial);
+            if (error) {
+                Serial.print(F("deserializeJson() failed: "));
+                Serial.println(error.c_str());
+                return;
+            }
+            // mudar a altura, distancia e tolerancia
+            if (jsonBuffer.containsKey("height")) {
+                setHeight(jsonBuffer["height"]);
+            }
+            if (jsonBuffer.containsKey("wantedDistance")) {
+                setWantedDistance(jsonBuffer["wantedDistance"]);
+            }
+            if (jsonBuffer.containsKey("tolerance")) {
+                setTolerance(jsonBuffer["tolerance"]);
+            }
+            jsonBuffer.clear();
+            adjustServoAngle();
+            adjustHipDistance();
+        }
+    }
+    // delay(50); 
 
     unsigned int distancia = calcularDistancia(); // Obtem a distancia capturada pelo sensor
 
@@ -62,11 +119,9 @@ void loop()
         // Calcula a distancia do objeto em relação ao usuario
         int DistanciaObjeto = sin(ServoAngle * pi / 180) * distancia;
 
-        Serial.print("Altura:");
-        Serial.println(AlturaObjeto);
-
-        Serial.print("Distancia:");
-        Serial.println(DistanciaObjeto);
+        jsonDocument["obstacleDetected"] = true;
+        jsonDocument["distance"] = DistanciaObjeto;
+        jsonDocument["height"] = AlturaObjeto;
     }
     else if ((HipDistancia - distancia) < -Tolerancia)
     {
@@ -79,13 +134,20 @@ void loop()
         // Calcula a distancia do buraco em relação ao usuario
         int DistanciaBuraco = sin(ServoAngle * pi / 180) * distancia;
 
-        Serial.print("Altura: -");
-        Serial.println(ProfundidadeBuraco);
-
-        Serial.print("Distancia: ");
-        Serial.println(DistanciaBuraco);
+        jsonDocument["obstacleDetected"] = true;
+        jsonDocument["distance"] = DistanciaBuraco;
+        jsonDocument["height"] = ProfundidadeBuraco;
+    }
+    else {
+        jsonDocument["obstacleDetected"] = true;
+        jsonDocument["distance"] = 0;
+        jsonDocument["height"] = 0;
     }
 
+    String jsonString;
+    serializeJson(jsonDocument, jsonString);
+
+    Serial.println(jsonString);
 } // Fim Loop()
 
 // ======================= FUNÇÕES =========================
