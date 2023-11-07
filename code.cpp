@@ -104,7 +104,7 @@ void loop()
             adjustHipDistance();
         }
     }
-    // delay(50); 
+    delay(100);
 
     unsigned int distancia = calcularDistancia(); // Obtem a distancia capturada pelo sensor
 
@@ -123,23 +123,8 @@ void loop()
         jsonDocument["distance"] = DistanciaObjeto;
         jsonDocument["height"] = AlturaObjeto;
     }
-    else if ((HipDistancia - distancia) < -Tolerancia)
-    {
-        // Há um "degrau/buraco/desnivel" à frente
-
-        // Calcular a altura do buraco
-        int ProfundidadeBuraco = cos(ServoAngle * pi / 180) * distancia;
-        ProfundidadeBuraco = (ProfundidadeBuraco - Altura) * -1; // Altura real
-
-        // Calcula a distancia do buraco em relação ao usuario
-        int DistanciaBuraco = sin(ServoAngle * pi / 180) * distancia;
-
-        jsonDocument["obstacleDetected"] = true;
-        jsonDocument["distance"] = DistanciaBuraco;
-        jsonDocument["height"] = ProfundidadeBuraco;
-    }
     else {
-        jsonDocument["obstacleDetected"] = true;
+        jsonDocument["obstacleDetected"] = false;
         jsonDocument["distance"] = 0;
         jsonDocument["height"] = 0;
     }
@@ -155,6 +140,9 @@ void loop()
 // Função para calcular a distância em centímetros
 unsigned int calcularDistancia()
 {
+  int allReads = 0;
+  const int timesToRead = 5;
+  for(int i = 0; i < timesToRead; i++){
     // Envia um pulso de 10µs no pino Trigger para iniciar a medição
     digitalWrite(TRIGGER_PIN, LOW);
     delayMicroseconds(2);
@@ -167,9 +155,10 @@ unsigned int calcularDistancia()
 
     // Converte a duração do pulso em microssegundos para centímetros
     // (a velocidade do som é de aproximadamente 29,1 microssegundos por centímetro)
-    unsigned int distancia = duracaoPulso / 58;
-
-    return distancia;
+    unsigned int distancia = duracaoPulso / 29.1 / 2;
+    allReads += distancia;
+  }
+    return allReads/timesToRead;
 }
 
 // Função para calcular o angulo que o sensor deve ser
