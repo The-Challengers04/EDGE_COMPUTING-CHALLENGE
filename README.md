@@ -1,4 +1,16 @@
 # Sistema de navegação para PCD Visuais
+Equipe
+---
+NOME | RM
+:-----:|:---:
+Gabriel Machado Belardino|550121
+Ana Beatriz Farah Alvez|97865
+Kaiky Alvaro de Miranda|98118
+Lucas Rodrigues da Silva|98344
+Pedro Henrique Bicas Couto|99534
+---
+
+
 O Inclui+ desenvolveu um sistema de navegação de pessoas com deficiência visual, do qual se consiste em um sensor de distancia que deve ser disposto nos ombros ou na cabeça do usuário do qual poderá ser notificado sobre obstáculos presentes no seu caminho.
 
 Para acessar o modelo do tinkerCad [Clique aqui](https://www.tinkercad.com/things/9lrOj3GNvcq)
@@ -26,14 +38,15 @@ MONTAGEM DO DISPOSITIVO
 
 #### Implementação do Código
 O codigo pode ser copiado do arquivo: [code](./code.cpp)
-Apos colar ele na IDE do Arduino, deve mudar alguns padrões para o funcionamento correto:  
-```C++
-//DEFININDO VARIAVEIS DO SISTEMA
-unsigned int Altura = 175; // Medida em cm
-unsigned int DistanciaDesejada = 200; // Medida em cm
-int Tolerancia = 5; // Medida de tolerancia que há entre a distancia obtida e a distancia determinada
-int intervalo_de_aviso = 2 * 1000;// Intervalo em milisegundos que o arduino imprime a informação no Serial Monitor
+Para configurar as medidas utilizadas(Altura, Distancia Desejada e Tolerancia do sensor) podem ser alteradas por meio do serial monitor ou pelo bluetooth enviando o seguinte JSON: 
+```JSON
+{
+    "height":175,
+    "wantedDistance":200,
+    "tolerance":10
+}
 ```
+**As medidas devem ser em _cm_**
 
 #### Regras
 * O Servo Motor deve Ser conectado no pino 9 ou 10
@@ -64,5 +77,6 @@ Em nosso aplicativo, esses dados serão convertidos em bips sonoros que podem se
 
 O intervalo dos bips vai diminuir proporcionalmente em relação a distancia do objeto detectado.
 
-Outra funcionalidade que nosso aplicativo oferece é o envio da localização atual do usuário para o um sistema de Nuvem. Possibilitando que familiares e/ou cuidadores possam agir caso o individuo se perca. 
-![Tela de compartilhamento da localização em tempo real](./images/CompartilharLocalizacaoApp.jpg).
+O Aplicativo Android pode ser encontrado no seguinte repositorio: [Inclui++ APP](https://github.com/The-Challengers04/Inclui-_EDGE_Android_App)
+
+
